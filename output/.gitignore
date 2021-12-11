@@ -1,0 +1,5 @@
+# Ignore everything in this directory
+# To prevent accidental leaks, when commiting/pushing changes
+*
+# Except this file
+!.gitignore
