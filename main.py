@@ -6,7 +6,8 @@ It creates a yaml file (with the list of admin commands) in the output folder.
 If specified to check against the current docs, this script will also
 generate a yaml file containing commands that are not already in the docs.
 """
-from pathlib import Path  # standard library
+from os import sys  # standard library
+from pathlib import Path
 import subprocess
 
 from ruamel.yaml import YAML
@@ -47,6 +48,15 @@ tester = []
 intern = []
 gamemaster = []
 admin = []
+
+
+def validate_input(option):
+    """Just to make sure the script is fed with correct input"""
+    if option in ("y", "n"):
+        return
+    spirit_logger.error(f"Invalid input: {option}, please use only 'y' or 'n'.")
+    logger.shutdown_logger()
+    sys.exit("SpiritMS Admin Commands Spider has been terminated.")
 
 
 def get_docs_location():
@@ -167,7 +177,7 @@ def extract_permission_level(line):
         String, representing the permission level required to execute the command
     """
     start = line.index(".") + 1
-    return line[start:-1]
+    return line[start:-2]
 
 
 def extract_commands(file_contents):
@@ -303,6 +313,7 @@ def fetch_outdated_commands(extracted_commands):
 # Main sequence:
 print("===== SpiritMS Admin Commands Spider =====")
 option = input("Would you also like to check if there are admin commands that are not already in SpiritSuite? (y/n) ").lower()
+validate_input(option)
 spirit_logger.info(f"     Check against SpiritSuite docs: {option == 'y'}")
 
 # First extact the admin commands into a dictionary
@@ -315,18 +326,18 @@ spirit_logger.info("Admin commands dumped.")
 # Then check for differences against SpiritSuite, if desired
 if option == "y":
     spirit_logger.info("Checking for differences against SpiritSuite...")
-
     player, tester, intern, gamemaster, admin = \
         docs_processor.extract_commands(read_contents(get_docs_location()))
     spirit_logger.info("Checking for commands not inside of the docs, or that have the wrong permission level...")
     new_commands = fetch_new_commands(commands)
     spirit_logger.debug("New commands extracted, now dumping...")
     yaml.dump(new_commands, Path(output_dir, "NewCommands.yaml"))
+    spirit_logger.info("New commands dumped.")
     spirit_logger.info("Checking for dead entries in the docs...")
     dead_commands = fetch_outdated_commands(commands)
     spirit_logger.debug("Dead commands extracted, now dumping...")
     with open(Path(output_dir, "DeadCommands.txt"), mode="w", encoding="utf-8") as current_file:
             current_file.write("\n".join(dead_commands))
-    spirit_logger.info("Differences checked.")
+    spirit_logger.info("Dead commands dumped.")
 
 spirit_logger.info("Sequence completed!")

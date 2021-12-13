@@ -31,7 +31,7 @@ class NullHandler(logging.Handler):
 
 def get_logger(logger_name):
 	logger = logging.getLogger(logger_name)
-	logger.setLevel(logging.WARNING)  # better to have too much log than not enough
+	logger.setLevel(logging.INFO)  # better to have too much log than not enough
 	
 	# Use silent handler if you want to be able to turn logging on and off
 	# h = NullHandler()  # Instantiate with a silent handler that doesn't return anything, since
