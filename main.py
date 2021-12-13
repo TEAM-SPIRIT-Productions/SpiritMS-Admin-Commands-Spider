@@ -13,6 +13,7 @@ from ruamel.yaml import YAML
 
 import config
 import logger  # local module (Spirit Logger)
+import docs_processor
 
 
 spirit_logger = logger.get_logger("main")
@@ -20,15 +21,12 @@ spirit_logger.info("Spirit Logger successfully loaded!")
 yaml = YAML(typ="safe", pure=True)
 
 # Set folder paths
-input_dir = Path(config.REPOSITORY_ROOT, REPOSITORY_POSTFIX)
+input_dir = Path(config.REPOSITORY_ROOT, config.REPOSITORY_POSTFIX)
 output_dir = Path(Path(), "output")
 spirit_logger.debug(
     f"    Input directory: {input_dir}\n    Output directory: {output_dir}"
 )
 # sanity check:
-configuration_check()
-
-
 def configuration_check():
     """Enforce repository location setting.
     """
@@ -41,6 +39,14 @@ def configuration_check():
     spirit_logger.error("Could not access one or more I/O folders - please check the target repositories in config.py, and/or re-clone this repository.")
     logger.shutdown_logger()
     sys.exit("SpiritMS Admin Commands Spider has been terminated.")
+
+configuration_check()
+
+player = []
+tester = []
+intern = []
+gamemaster = []
+admin = []
 
 
 def get_docs_location():
@@ -137,8 +143,17 @@ def extract_aliases(line):
     Returns:
         List of Strings, representing the aliases
     """
-    start = line.index("{") + 1
-    end = line.index("}")
+    if not "{" in line:
+        # sanity check for single-alias commands that don't follow conventions
+        start = line.index(" \"") + 1
+        end = line.index(",")
+    else:
+        try:
+            start = line.index("{") + 1
+            end = line.index("}")
+        except ValueError as ve:
+            spirit_logger.warning(f"Unable to process alias in line: {line}")
+            spirit_logger.exception(ve, exc_info=True)
     return line[start:end].replace("\"", "").split(", ")
 
 
@@ -186,6 +201,105 @@ def extract_commands(file_contents):
     return output_buffer
 
 
+def get_target_by_permission_level(permission_level):
+    """
+    Get the target List, from the permission level property of a command.
+    Requires the docs_processor::extract_commands function to be run, for
+    the permission level lists to be populated.
+
+    Args:
+        permission_level: String
+    Returns:
+        List of Strings
+    """
+    if permission_level == "Player":
+        return player
+    elif permission_level == "Tester":
+        return tester
+    elif permission_level == "Intern":
+        return intern
+    elif permission_level == "GameMaster":
+        return gamemaster
+    else:
+        return admin
+
+
+def fetch_new_commands(extracted_commands):
+    """
+    Compares extracted commands against SpiritSuite docs contents,
+    to find commands not inside of the docs, or have the wrong permission level.
+    
+    Args:
+        extracted_commands: Dictionary of Dictionaries of Lists and Strings
+    Returns:
+        Dictionary of Dictionaries of Lists and Strings:
+            {
+                "Class Name": {
+                    aliases: []
+                    permission: ""
+                }
+            }
+    """
+    buffer = {}
+    for class_name, metadata in extracted_commands.items():
+        if docs_processor.command_not_in_docs(
+            metadata["aliases"], 
+            get_target_by_permission_level(metadata["permission"])
+        ):
+            buffer[class_name] = metadata
+    return buffer
+    
+    
+def permission_text(number):
+    """
+    To get the appropriate permission level text for each loop iteration
+    in main::fetch_outdated_commands
+    """
+    if number == 0:
+        return "Player Commands:\n"
+    elif number == 1:
+        return "Tester Commands:\n"
+    elif number == 2:
+        return "Intern Commands:\n"
+    elif number == 3:
+        return "GameMaster Commands:\n"
+    else:
+        return "Admin Commands:\n"
+    
+    
+def fetch_outdated_commands(extracted_commands):
+    """
+    Compares extracted commands against SpiritSuite docs contents,
+    to find entries in the docs that are outdated.
+    
+    Requires the docs_processor::extract_commands function to be run, for
+    the permission level lists to be populated.
+    
+    Args:
+        extracted_commands: Dictionary of Dictionaries of Lists and Strings
+    Returns:
+        List of Strings, representing aliases that have been removed
+    """
+    # First flatten the dictionary
+    aliases = []
+    for metadata in extracted_commands.values():
+        aliases.extend(metadata["aliases"])
+    
+    docs_aliases = [player, tester, intern, gamemaster, admin]
+    output = ["Outdated Aliases\n\n"]
+    for index, level in enumerate(docs_aliases):
+        output.append(permission_text(index))
+        output.append("=====================\n")
+        buffer = [command for command in level if not command in aliases]
+        if buffer:
+            output.extend(buffer)
+            buffer.clear()
+        else:
+            output.append("\nNONE\n")
+    
+    return output
+
+
 # Main sequence:
 print("===== SpiritMS Admin Commands Spider =====")
 option = input("Would you also like to check if there are admin commands that are not already in SpiritSuite? (y/n) ").lower()
@@ -201,7 +315,18 @@ spirit_logger.info("Admin commands dumped.")
 # Then check for differences against SpiritSuite, if desired
 if option == "y":
     spirit_logger.info("Checking for differences against SpiritSuite...")
-    # TODO: Fill in logic
+
+    player, tester, intern, gamemaster, admin = \
+        docs_processor.extract_commands(read_contents(get_docs_location()))
+    spirit_logger.info("Checking for commands not inside of the docs, or that have the wrong permission level...")
+    new_commands = fetch_new_commands(commands)
+    spirit_logger.debug("New commands extracted, now dumping...")
+    yaml.dump(new_commands, Path(output_dir, "NewCommands.yaml"))
+    spirit_logger.info("Checking for dead entries in the docs...")
+    dead_commands = fetch_outdated_commands(commands)
+    spirit_logger.debug("Dead commands extracted, now dumping...")
+    with open(Path(output_dir, "DeadCommands.txt"), mode="w", encoding="utf-8") as current_file:
+            current_file.write("\n".join(dead_commands))
     spirit_logger.info("Differences checked.")
 
 spirit_logger.info("Sequence completed!")
