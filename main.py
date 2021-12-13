@@ -296,16 +296,17 @@ def fetch_outdated_commands(extracted_commands):
         aliases.extend(metadata["aliases"])
     
     docs_aliases = [player, tester, intern, gamemaster, admin]
-    output = ["Outdated Aliases\n\n"]
+    output = ["=== Outdated Aliases ==="]
+    output.append("These are aliases in the SpiritSuite docs that are no longer part of the SpiritMS repository.\n")
     for index, level in enumerate(docs_aliases):
         output.append(permission_text(index))
-        output.append("=====================\n")
+        output.append("=====================")
         buffer = [command for command in level if not command in aliases]
         if buffer:
             output.extend(buffer)
             buffer.clear()
         else:
-            output.append("\nNONE\n")
+            output.append("NONE\n")
     
     return output
 
@@ -331,7 +332,11 @@ if option == "y":
     spirit_logger.info("Checking for commands not inside of the docs, or that have the wrong permission level...")
     new_commands = fetch_new_commands(commands)
     spirit_logger.debug("New commands extracted, now dumping...")
-    yaml.dump(new_commands, Path(output_dir, "NewCommands.yaml"))
+    if new_commands:
+        yaml.dump(new_commands, Path(output_dir, "NewCommands.yaml"))
+    else:
+        with open(Path(output_dir, "NewCommands.yaml"), mode="w", encoding="utf-8") as current_file:
+            current_file.write("SpiritSuite docs is already up to date.")
     spirit_logger.info("New commands dumped.")
     spirit_logger.info("Checking for dead entries in the docs...")
     dead_commands = fetch_outdated_commands(commands)
@@ -340,4 +345,4 @@ if option == "y":
             current_file.write("\n".join(dead_commands))
     spirit_logger.info("Dead commands dumped.")
 
-spirit_logger.info("Sequence completed!")
+spirit_logger.info("Sequence completed! Check the output folder for the results.")

@@ -16,3 +16,11 @@ This project is adapted from [ascii_checker](https://github.com/TEAM-SPIRIT-Prod
 3) Run `start.bat`  
 4) Input whether to check admin commands list against SpiritSuite docs  
 5) Check the `/output/` folder of this repository for the results
+
+---
+- AdminCommands.yaml  
+    - List of all admin commands found in the target repository  
+- DeadCommands.txt  
+    - List of command aliases recorded in the SpiritSuite docs that are no longer part of the SpiritMS repository  
+- NewCommands.yaml  
+    - List of commands that are either not recorded inside of the docs, or have the wrong permission level  
